@@ -23,10 +23,15 @@ export default {
           initPendoVisitor(visitorDetails);
 
           // Track visitor initialization event
-          pendo.track("visitor_initialized", {
-            email: visitorDetails.email,
-            full_name: visitorDetails.full_name,
-          });
+          // visitorId and accountId are auto-attached by the Pendo agent via pendo.initialize()
+          try {
+            pendo.track("visitor_initialized", {
+              email: visitorDetails.email,
+              full_name: visitorDetails.full_name,
+            });
+          } catch (e) {
+            console.warn("Pendo track event failed:", e);
+          }
 
           this.resetForm();
       },
