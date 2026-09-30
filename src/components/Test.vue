@@ -29,6 +29,7 @@ export default {
           });
 
           this.resetForm();
+          this.$router.push('/invoices');
       },
 
     },    
@@ -37,7 +38,7 @@ export default {
 </script>
 <template>
   <div class="test-container">    
-    <a-typography-title :level="h1">Initialise Visitor</a-typography-title>
+    <a-typography-title :level="3">Sign in</a-typography-title>
     <a-form
     :model="formState"
     @finish="submitData"
@@ -60,9 +61,6 @@ export default {
 
 <style lang="css">
   .test-container {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
+    margin: 48px auto;
   }
 </style>    

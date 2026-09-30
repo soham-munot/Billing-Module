@@ -1,2 +1,1 @@
-export const AKSHAY_TEST_APP_ID = '45525c5c-a258-4c1a-b685-7f6d565d92de';
 export const PENDO_MANGO_APP_ID = '6a136961-2990-4471-8961-69b36b3d0fbd';

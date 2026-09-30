@@ -6,13 +6,17 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "traffic:good": "node scripts/traffic.mjs --mode=good",
+    "traffic:bad": "node scripts/traffic.mjs --mode=bad"
   },
   "dependencies": {
     "ant-design-vue": "^4.2.6",
-    "vue": "^3.5.40"
+    "vue": "^3.5.40",
+    "vue-router": "^4.6.4"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@vitejs/plugin-vue": "^6.0.8",
     "vite": "^8.1.5",
     "vite-plugin-vue-devtools": "^8.1.5"
