@@ -68,26 +68,58 @@ async function applyPromo(page) {
   await page.waitForTimeout(1200)
 }
 
+const GUIDE = '#pendo-base'
+
+async function pickRating(page, groupName, rating) {
+  const radio = page.locator(`${GUIDE} input.pendo-radio[name="${groupName}"]`).nth(rating - 1)
+  const id = await radio.getAttribute('id')
+  const label = page.locator(`${GUIDE} label[for="${id}"]`)
+  if (await label.count()) await label.first().click()
+  else await radio.check({ force: true })
+}
+
+async function advance(page) {
+  const button = page
+    .locator(`${GUIDE} button`)
+    .filter({ hasText: /^(next|submit|done|finish|close)$/i })
+    .first()
+  if (await button.count()) {
+    await button.click()
+    await page.waitForTimeout(900)
+    return true
+  }
+  return false
+}
+
 async function answer(page, index) {
-  const guide = page.locator('[id^="pendo-g-"]').first()
+  const guide = page.locator(GUIDE)
+  const started = Date.now()
   try {
-    await guide.waitFor({ timeout: 8000 })
+    await guide.locator('input.pendo-radio').first().waitFor({ state: 'attached', timeout: 45000 })
   } catch {
     console.log('  no survey guide shown')
-    return
+    return false
   }
+  console.log(`  survey guide after ${Math.round((Date.now() - started) / 1000)}s`)
+  await page.waitForTimeout(500)
   const positive = mode === 'good' ? index % 5 !== 0 : index % 4 === 0
-  const rating = positive ? (index % 2 === 0 ? '5' : '4') : index % 2 === 0 ? '1' : '2'
-  await guide.getByRole('button', { name: rating, exact: true }).first().click()
-  await page.waitForTimeout(700)
-  const textarea = guide.locator('textarea').first()
-  if (await textarea.count()) {
-    const quotes = QUOTES[positive ? 'good' : 'bad']
-    await textarea.fill(quotes[index % quotes.length])
-    const next = guide.getByRole('button', { name: /submit|next|done|finish/i }).first()
-    if (await next.count()) await next.click()
+  const ratings = positive ? [5, 4, 5, 4] : [1, 2, 1, 2]
+  const groups = await page.$$eval(`${GUIDE} input.pendo-radio`, (els) => [...new Set(els.map((e) => e.name))])
+  for (const [i, name] of groups.entries()) {
+    await pickRating(page, name, ratings[(index + i) % ratings.length])
+    await page.waitForTimeout(250)
   }
-  await page.waitForTimeout(1500)
+  await advance(page)
+  const quotes = QUOTES[positive ? 'good' : 'bad']
+  const textareas = page.locator(`${GUIDE} textarea`)
+  const count = await textareas.count()
+  for (let i = 0; i < count; i++) {
+    await textareas.nth(i).fill(quotes[(index + i) % quotes.length])
+  }
+  if (count > 0) await advance(page)
+  await advance(page)
+  console.log(`  survey answered (${positive ? 'positive' : 'negative'}, ${groups.length} ratings, ${count} open answers)`)
+  return true
 }
 
 const browser = await chromium.launch({ headless: args.headless !== 'false' })
@@ -99,9 +131,9 @@ for (let i = 0; i < visitors; i++) {
   console.log(`[${mode}] ${visitorId}`)
   try {
     await signIn(page, visitorId)
+    if (answerSurvey) await answer(page, i)
     await browse(page)
     await applyPromo(page)
-    if (answerSurvey) await answer(page, i)
     await page.waitForTimeout(2500)
   } catch (e) {
     console.log(`  failed: ${e.message}`)
