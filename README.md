@@ -28,3 +28,11 @@ npm run traffic:bad  -- --visitors=15
 ```
 
 Options: `--base=<url>`, `--visitors=<n>`, `--offset=<n>` (visitor id start), `--survey=false`, `--headless=false`. Good mode answers the CSAT survey mostly 4 or 5. Bad mode clicks Apply promo five times in a row, then answers mostly 1 or 2 with a complaint about the promo button. Run bad mode only after the bad release is merged.
+
+With several CSAT surveys published, `--surveys=<n>` answers up to n guides per visitor as Pendo shows them, and `--guide=<guide id>` shows one survey's delivery guide and answers only that one. `--quotes-good="a|b"` and `--quotes-bad="a|b"` replace the open-answer text.
+
+```sh
+node scripts/dropoff.mjs --guide=<guide id> --visitors=20 --advance=0.7
+```
+
+Simulates a survey visitors abandon: the first `--advance` share of visitors rate step 1, click Next and close the guide on step 2; the rest close it on step 1. `--finish=<n>` completes every nth advancing visitor's survey so the response rate is not exactly zero.

@@ -11,6 +11,8 @@ const base = args.base || 'http://localhost:5173'
 const visitors = Number(args.visitors || 15)
 const offset = Number(args.offset || (mode === 'bad' ? 100 : 0))
 const answerSurvey = args.survey !== 'false'
+const surveys = Number(args.surveys || 1)
+const guideId = args.guide
 
 const QUOTES = {
   good: ['Quick and clear.', 'Promo worked first time.', 'Easy to find my invoices.', 'Smooth checkout.'],
@@ -21,6 +23,8 @@ const QUOTES = {
     'Apply promo is broken, very annoying.',
   ],
 }
+if (args['quotes-good']) QUOTES.good = args['quotes-good'].split('|')
+if (args['quotes-bad']) QUOTES.bad = args['quotes-bad'].split('|')
 
 async function waitForPendo(page) {
   await page.waitForFunction(() => window.pendo && window.pendo.isReady && window.pendo.isReady(), null, {
@@ -91,11 +95,11 @@ async function advance(page) {
   return false
 }
 
-async function answer(page, index) {
+async function answer(page, index, timeout) {
   const guide = page.locator(GUIDE)
   const started = Date.now()
   try {
-    await guide.locator('input.pendo-radio').first().waitFor({ state: 'attached', timeout: 45000 })
+    await guide.locator('input.pendo-radio').first().waitFor({ state: 'attached', timeout })
   } catch {
     console.log('  no survey guide shown')
     return false
@@ -119,7 +123,27 @@ async function answer(page, index) {
   if (count > 0) await advance(page)
   await advance(page)
   console.log(`  survey answered (${positive ? 'positive' : 'negative'}, ${groups.length} ratings, ${count} open answers)`)
+  await page.locator(`${GUIDE} input.pendo-radio`).first().waitFor({ state: 'detached', timeout: 10000 }).catch(() => {})
   return true
+}
+
+async function showGuide(page) {
+  for (let i = 0; i < 6 && (await page.locator(GUIDE).count()); i++) {
+    await page.evaluate(() => window.pendo.onGuideDismissed())
+    await page.waitForTimeout(700)
+  }
+  await page.evaluate((id) => window.pendo.showGuideById(id), guideId)
+}
+
+async function answerAll(page, index) {
+  if (guideId) {
+    await showGuide(page)
+    await answer(page, index, 20000)
+    return
+  }
+  for (let n = 0; n < surveys; n++) {
+    if (!(await answer(page, index + n, n === 0 ? 45000 : 20000))) return
+  }
 }
 
 const browser = await chromium.launch({ headless: args.headless !== 'false' })
@@ -131,7 +155,7 @@ for (let i = 0; i < visitors; i++) {
   console.log(`[${mode}] ${visitorId}`)
   try {
     await signIn(page, visitorId)
-    if (answerSurvey) await answer(page, i)
+    if (answerSurvey) await answerAll(page, i)
     await browse(page)
     await applyPromo(page)
     await page.waitForTimeout(2500)
