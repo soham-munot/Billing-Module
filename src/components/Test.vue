@@ -23,10 +23,14 @@ export default {
           initPendoVisitor(visitorDetails);
 
           // Track visitor initialization event
-          pendo.track("visitor_initialized", {
-            email: visitorDetails.email,
-            full_name: visitorDetails.full_name,
-          });
+          try {
+            pendo.track("visitor_initialized", {
+              email: visitorDetails.email,
+              full_name: visitorDetails.full_name,
+            });
+          } catch (e) {
+            console.error("Pendo track event failed:", e);
+          }
 
           this.resetForm();
       },
