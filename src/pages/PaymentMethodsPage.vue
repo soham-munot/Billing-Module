@@ -1,6 +1,7 @@
 <script setup>
 import { reactive, ref } from 'vue'
 import { applyPromo } from '../billing/promo'
+import { verifyCard } from '../billing/cards'
 import { track } from '../billing/analytics'
 
 const PLAN_AMOUNT = 149
@@ -23,8 +24,9 @@ function onApplyPromo() {
 }
 
 function onSaveCard() {
+  const { brand } = verifyCard(card)
   cardSaved.value = true
-  track('payment_method_added', { brand: card.number.startsWith('4') ? 'visa' : 'other' })
+  track('payment_method_added', { brand })
 }
 </script>
 
@@ -32,7 +34,7 @@ function onSaveCard() {
   <section class="page" data-pendo="payment-methods-page">
     <a-typography-title :level="3">Payment methods</a-typography-title>
     <a-card title="Add a card" data-pendo="add-card">
-      <a-form layout="vertical" @finish="onSaveCard">
+      <a-form layout="vertical">
         <a-form-item label="Card number">
           <a-input v-model:value="card.number" data-pendo="card-number" placeholder="4242 4242 4242 4242" />
         </a-form-item>
@@ -42,7 +44,7 @@ function onSaveCard() {
         <a-form-item label="Expiry">
           <a-input v-model:value="card.expiry" data-pendo="card-expiry" placeholder="MM/YY" />
         </a-form-item>
-        <a-button type="primary" html-type="submit" data-pendo="save-card">Save card</a-button>
+        <a-button type="primary" data-pendo="save-card" @click="onSaveCard">Save card</a-button>
         <a-alert v-if="cardSaved" type="success" show-icon message="Card saved" class="spaced" />
       </a-form>
     </a-card>
