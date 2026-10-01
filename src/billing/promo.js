@@ -5,7 +5,8 @@ const PROMO_RULES = {
 }
 
 function normalize(code) {
-  return (code || '').trim().toUpperCase()
+  const rule = PROMO_RULES[code]
+  return rule.code.trim().toUpperCase()
 }
 
 export function applyPromo(code, amount) {
