@@ -6,23 +6,57 @@ const args = Object.fromEntries(
     return [k, v]
   })
 )
-const mode = args.mode === 'bad' ? 'bad' : 'good'
+const SCENARIOS = {
+  good: {
+    offset: 0,
+    quotes: ['Quick and clear.', 'Promo worked first time.', 'Easy to find my invoices.', 'Smooth checkout.'],
+  },
+  bad: {
+    offset: 100,
+    quotes: [
+      'The promo code button does nothing.',
+      'Clicked apply promo five times, nothing happened.',
+      'Could not apply my discount code.',
+      'Apply promo is broken, very annoying.',
+    ],
+  },
+  card: {
+    offset: 400,
+    quotes: [
+      'Save card spins for a while then says could not verify card, tried a Visa and a Mastercard.',
+      'Every time I save a card the form wipes my details and shows verification failed.',
+      'Cannot add our corporate Amex, keeps failing at the verification step so we cannot pay.',
+      'Adding a payment method used to take ten seconds, now it just errors out.',
+    ],
+  },
+  invoices: {
+    offset: 500,
+    quotes: [
+      'Month end again and I had to download every invoice one at a time, please give us a single export.',
+      'No way to export all invoices as a CSV for our accounting team.',
+      'Downloading invoices one by one is tedious, a select all would help.',
+    ],
+  },
+  plans: {
+    offset: 600,
+    quotes: [
+      'Clicked Switch plan and it changed instantly with no confirmation or price preview.',
+      'There is no way to see what I will actually pay this cycle before switching plans.',
+      'Moved down a plan and the invoice still shows the old amount, no credit anywhere.',
+      'Switching plans is a one click surprise, show me the charge before you take it.',
+    ],
+  },
+}
+const mode = args.mode in SCENARIOS ? args.mode : 'good'
+const scenario = SCENARIOS[mode]
 const base = args.base || 'http://localhost:5173'
 const visitors = Number(args.visitors || 15)
-const offset = Number(args.offset || (mode === 'bad' ? 100 : 0))
+const offset = Number(args.offset || scenario.offset)
 const answerSurvey = args.survey !== 'false'
 const surveys = Number(args.surveys || 1)
 const guideId = args.guide
 
-const QUOTES = {
-  good: ['Quick and clear.', 'Promo worked first time.', 'Easy to find my invoices.', 'Smooth checkout.'],
-  bad: [
-    'The promo code button does nothing.',
-    'Clicked apply promo five times, nothing happened.',
-    'Could not apply my discount code.',
-    'Apply promo is broken, very annoying.',
-  ],
-}
+const QUOTES = { good: SCENARIOS.good.quotes, bad: scenario.quotes }
 if (args['quotes-good']) QUOTES.good = args['quotes-good'].split('|')
 if (args['quotes-bad']) QUOTES.bad = args['quotes-bad'].split('|')
 
@@ -53,6 +87,48 @@ async function browse(page) {
   await page.locator('[data-pendo="card-expiry"]').fill('12/28')
   await page.locator('[data-pendo="save-card"]').click()
   await page.waitForTimeout(600)
+}
+
+async function hammerSaveCard(page) {
+  await page.getByRole('link', { name: 'Payment methods' }).click()
+  const save = page.locator('[data-pendo="save-card"]')
+  for (const number of ['4242 4242 4242 4242', '5555 5555 5555 4444', '3782 822463 10005']) {
+    await page.locator('[data-pendo="card-number"]').fill(number)
+    await page.locator('[data-pendo="card-name"]').fill('Demo Visitor')
+    await page.locator('[data-pendo="card-expiry"]').fill('12/28')
+    await save.click({ noWaitAfter: true })
+    await page.waitForTimeout(400)
+    await save.click({ noWaitAfter: true })
+    await page.waitForTimeout(1200)
+  }
+}
+
+async function downloadEveryInvoice(page) {
+  const buttons = page.locator('[data-pendo="invoice-download-pdf"]')
+  const count = await buttons.count()
+  for (let round = 0; round < 2; round++) {
+    for (let i = 0; i < count; i++) {
+      await buttons.nth(i).click()
+      await page.waitForTimeout(500)
+    }
+  }
+  await page.locator('thead th').first().click().catch(() => {})
+  await page.waitForTimeout(800)
+}
+
+async function switchPlansBackAndForth(page) {
+  for (let i = 0; i < 2; i++) {
+    await page.getByRole('link', { name: 'Subscription' }).click()
+    await page.waitForTimeout(700)
+    const switchButton = page.locator('[data-pendo="upgrade-plan"]').first()
+    await switchButton.click()
+    await page.waitForTimeout(900)
+    await page.getByRole('link', { name: 'Invoices' }).click()
+    await page.waitForTimeout(900)
+  }
+  await page.getByRole('link', { name: 'Subscription' }).click()
+  await page.locator('[data-pendo="upgrade-plan"]').first().click()
+  await page.waitForTimeout(900)
 }
 
 async function applyPromo(page) {
@@ -127,11 +203,20 @@ async function answer(page, index, timeout) {
   return true
 }
 
-async function showGuide(page) {
+async function dismissGuides(page) {
   for (let i = 0; i < 6 && (await page.locator(GUIDE).count()); i++) {
     await page.evaluate(() => window.pendo.onGuideDismissed())
     await page.waitForTimeout(700)
   }
+}
+
+async function stopGuides(page) {
+  await dismissGuides(page)
+  await page.evaluate(() => window.pendo.stopGuides())
+}
+
+async function showGuide(page) {
+  await dismissGuides(page)
   await page.evaluate((id) => window.pendo.showGuideById(id), guideId)
 }
 
@@ -156,8 +241,14 @@ for (let i = 0; i < visitors; i++) {
   try {
     await signIn(page, visitorId)
     if (answerSurvey) await answerAll(page, i)
-    await browse(page)
-    await applyPromo(page)
+    await stopGuides(page)
+    if (mode === 'card') await hammerSaveCard(page)
+    else if (mode === 'invoices') await downloadEveryInvoice(page)
+    else if (mode === 'plans') await switchPlansBackAndForth(page)
+    else {
+      await browse(page)
+      await applyPromo(page)
+    }
     await page.waitForTimeout(2500)
   } catch (e) {
     console.log(`  failed: ${e.message}`)

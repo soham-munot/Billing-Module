@@ -29,7 +29,19 @@ npm run traffic:bad  -- --visitors=15
 
 Options: `--base=<url>`, `--visitors=<n>`, `--offset=<n>` (visitor id start), `--survey=false`, `--headless=false`. Good mode answers the CSAT survey mostly 4 or 5. Bad mode clicks Apply promo five times in a row, then answers mostly 1 or 2 with a complaint about the promo button. Run bad mode only after the bad release is merged.
 
-With several CSAT surveys published, `--surveys=<n>` answers up to n guides per visitor as Pendo shows them, and `--guide=<guide id>` shows one survey's delivery guide and answers only that one. `--quotes-good="a|b"` and `--quotes-bad="a|b"` replace the open-answer text.
+With several CSAT surveys published, `--surveys=<n>` answers up to n guides per visitor as Pendo shows them, and `--guide=<guide id>` shows one survey's delivery guide and answers only that one. After the targeted survey is answered, guides are stopped for the session so no other survey's lightbox blocks the flow. `--quotes-good="a|b"` and `--quotes-bad="a|b"` replace the open-answer text.
+
+`--mode` picks the scenario, each with its own flow, complaints and default visitor-id offset:
+
+| Mode | Flow after the survey | Needs |
+| --- | --- | --- |
+| `good` | browse, apply a promo once | nothing |
+| `bad` | click Apply promo five times, then once more | the promo validation refactor (PR #4) served |
+| `card` | three cards saved twice each | the card verification change served |
+| `invoices` | every invoice downloaded twice, a click on the table header | nothing |
+| `plans` | switch plan, go to Invoices and back, twice, switch again | nothing |
+
+Good traffic has to land in an earlier week than the bad traffic for a score drop to register; Pendo events cannot be backdated.
 
 ```sh
 node scripts/dropoff.mjs --guide=<guide id> --visitors=20 --advance=0.7
